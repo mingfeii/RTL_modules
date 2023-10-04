@@ -101,4 +101,10 @@ initial
     $stop();
   end
 
+
+initial begin 
+  check_sum();
+end 
+
+
 endmodule

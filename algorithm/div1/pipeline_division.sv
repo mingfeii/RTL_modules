@@ -4,29 +4,21 @@ module pipeline_division #(
 )(
   input                           clk_i,
   input                           rst_n_i,
-  input  [DIVINDED_WIDTH - 1 : 0] divinded_i,
+  input  [DIVINDED_WIDTH - 1 : 0] dividend_i,
   input  [DIVISOR_WIDTH - 1 : 0]  divisor_i,
   input                           valid_i,
   output [DIVINDED_WIDTH - 1 : 0] quotient_o,
-  output [DIVISOR_WIDTH - 1 : 0]  reminder_o,
+  output [DIVISOR_WIDTH - 1 : 0]  remainder_o,
   output                          valid_o
   );
 
 localparam STAGES_AMOUNT   = DIVINDED_WIDTH + 2;
-localparam SHIFT_REG_WIDTH = DIVINDED_WIDTH * 2;
 
-// reg [STAGES_AMOUNT - 1 : 0]  rh [DIVINDED_WIDTH - 1 : 0];
-// reg [STAGES_AMOUNT - 1 : 0]  rl [DIVINDED_WIDTH - 1 : 0];
-// reg [STAGES_AMOUNT - 1 : 0]  rh_comb [DIVINDED_WIDTH - 1 : 0];
-// reg [STAGES_AMOUNT - 1 : 0]  q;
-// reg [STAGES_AMOUNT - 1 : 0]  divisor_lock [DIVISOR_WIDTH - 1 : 0];
-// reg [STAGES_AMOUNT - 1 : 0]  valid_d;
-
-reg [STAGES_AMOUNT - 1 : 0]  [DIVINDED_WIDTH - 1 : 0] rh ;
-reg [STAGES_AMOUNT - 1 : 0]  [DIVINDED_WIDTH - 1 : 0] rl ;
-reg [STAGES_AMOUNT - 1 : 0]  [DIVINDED_WIDTH - 1 : 0] rh_comb ;
+reg [DIVINDED_WIDTH - 1 : 0] rh [STAGES_AMOUNT - 1 : 0];
+reg [DIVINDED_WIDTH - 1 : 0] rl [STAGES_AMOUNT - 1 : 0];
+reg [DIVINDED_WIDTH - 1 : 0] rh_comb [STAGES_AMOUNT - 1 : 0];
 reg [STAGES_AMOUNT - 1 : 0]  q;
-reg [STAGES_AMOUNT - 1 : 0]  [DIVISOR_WIDTH - 1 : 0] divisor_lock ;
+reg [DIVISOR_WIDTH - 1 : 0] divisor_lock [STAGES_AMOUNT - 1 : 0];
 reg [STAGES_AMOUNT - 1 : 0]  valid_d;
 
 always @( posedge clk_i, negedge rst_n_i ) begin 
@@ -71,7 +63,7 @@ always @( posedge clk_i, negedge rst_n_i ) begin
       rl[i] <= 0;
     end else if( i == 0 ) begin 
         rh[i] <= 0;
-        rl[i] <= divinded_i;
+        rl[i] <= dividend_i;
     end else if( i == ( STAGES_AMOUNT - 1 ) )  begin
         rh[i] <= rh_comb[i - 1];
         rl[i] <= { rl[i - 1][DIVINDED_WIDTH - 2 : 0], q[i - 1] };
@@ -83,7 +75,7 @@ always @( posedge clk_i, negedge rst_n_i ) begin
 end 
 
 assign quotient_o = rl[STAGES_AMOUNT - 1];
-assign reminder_o = rh[STAGES_AMOUNT - 1];
+assign remainder_o = rh[STAGES_AMOUNT - 1];
 assign valid_o    = valid_d[STAGES_AMOUNT - 1];
 
 endmodule

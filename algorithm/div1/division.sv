@@ -1,115 +1,61 @@
+
 module division #(
-  parameter int WORD_W = 8
+  parameter  N = 8,
+  parameter  M  = 8
 )(
-  input                   clk_i,
-  input                   rst_i,
-  input                   start_i,
-  input  [WORD_W - 1 : 0] divinded_i,
-  input  [WORD_W - 1 : 0] divisor_i,
-  output                  ready_o,
-  output                  valid_o,
-  output [WORD_W - 1 : 0] quotient_o,
-  output [WORD_W - 1 : 0] reminder_o
+  input              clk_i,
+  input              rst_n_i,
+  input  wire signed [N - 1 : 0] dividend_i,
+  input  wire signed [M - 1 : 0] divisor_i,
+  input              valid_i,
+  output wire signed [N - 1 : 0] quotient_o,
+  output wire signed [M - 1 : 0] remainder_o,
+  output             valid_o
+  );
+
+wire [N-1:0]  unsigned_dividend;
+wire [M-1:0]  unsigned_divisor;
+wire [N-1:0]  unsigned_quotient;
+wire [M-1:0]  unsigned_remainder;
+wire signed [N-1:0]  signed_quotient;
+wire signed [M-1:0]  signed_remainder;
+
+wire dividend_is_negetive = $signed(dividend_i) < 0 ? 1'b1 : 1'b0;
+wire divisor_is_negetive = $signed(divisor_i) < 0 ? 1'b1 : 1'b0;
+wire dividend_is_negetive_d;
+wire divisor_is_negetive_d;
+
+assign unsigned_dividend = dividend_is_negetive ? -dividend_i : dividend_i;
+assign unsigned_divisor = divisor_is_negetive ? -divisor_i : divisor_i;
+
+pipeline_data_delay #( 
+	.LATENCY(N+2),
+	.DW(2)
+)sign_delay_U(
+	.clk(clk_i),
+  .rst_n(rst_n_i),
+	.in_data({dividend_is_negetive,divisor_is_negetive}),
+	.o_data({dividend_is_negetive_d,divisor_is_negetive_d})
 );
 
-localparam int CNT_W = $clog2( WORD_W );
+pipeline_division #(
+  .DIVINDED_WIDTH ( N ),
+  .DIVISOR_WIDTH  ( M  )
+) div_u (
+  .clk_i          ( clk_i              ),
+  .rst_n_i        ( rst_n_i            ),
+  .dividend_i     ( unsigned_dividend  ),
+  .divisor_i      ( unsigned_divisor   ),
+  .valid_i        ( valid_i            ),
+  .quotient_o     ( unsigned_quotient  ),
+  .remainder_o    ( unsigned_remainder ),
+  .valid_o        ( valid_o        )
+);
 
-logic [WORD_W - 1 : 0] rh, rh_comb;
-logic [WORD_W - 1 : 0] rl;
-logic [WORD_W - 1 : 0] divisor_lock;
-logic [CNT_W : 0]      shifts_left;
-logic                  q;
+  // 计算有符号商和余数
+  assign signed_quotient = ( dividend_is_negetive_d ^ divisor_is_negetive_d) ? -unsigned_quotient : unsigned_quotient;
+  assign signed_remainder = (dividend_is_negetive_d) ? -unsigned_remainder : unsigned_remainder;
+  assign quotient_o = signed_quotient;
+  assign remainder_o = signed_remainder;
 
-enum logic [1 : 0] { IDLE_S,
-                     OP_S,
-                     LAST_S,
-                     DONE_S } state, next_state;
-
-always_ff @( posedge clk_i, posedge rst_i )
-  if( rst_i )
-    state <= IDLE_S;
-  else
-    state <= next_state;
-
-always_comb
-  begin
-    next_state = state;
-    case( state )
-      IDLE_S:
-        begin
-          if( start_i )
-            next_state = OP_S;
-        end
-      OP_S:
-        begin
-          if( shifts_left == 'd1 )
-            next_state = LAST_S;
-        end
-      LAST_S:
-        begin
-          next_state = DONE_S;
-        end
-      DONE_S:
-        begin
-          next_state = IDLE_S;
-        end
-    endcase
-  end
-
-assign q = rh >= divisor_lock;
-
-always_comb
-  begin
-    rh_comb = rh;
-    if( rh >= divisor_lock )
-      rh_comb = rh - divisor_lock;
-  end
-
-always_ff @( posedge clk_i, posedge rst_i )
-  if( rst_i )
-    begin
-      rh <= '0;
-      rl <= '0;
-    end
-  else
-    if( state == IDLE_S && start_i )
-      begin
-        rh <= '0;
-        rl <= divinded_i;
-      end
-    else
-      if( state == OP_S )
-        begin
-          rh <= { rh_comb[WORD_W - 2 : 0], rl[WORD_W - 1] };
-          rl <= { rl[WORD_W - 2 : 0], q };
-        end
-      else
-        if( state == LAST_S )
-          begin
-            rh <= rh_comb;
-            rl <= { rl[WORD_W - 2 : 0], q };  
-          end
-
-always_ff @( posedge clk_i, posedge rst_i )
-  if( rst_i )
-    shifts_left <= '0;
-  else
-    if( state == IDLE_S && start_i )
-      shifts_left <= WORD_W[CNT_W : 0];
-    else
-      if( state == OP_S )
-        shifts_left <= shifts_left - 1'b1;
-
-always_ff @( posedge clk_i, posedge rst_i )
-  if( rst_i )
-    divisor_lock <= '0;
-  else
-    if( state == IDLE_S && start_i )
-      divisor_lock <= divisor_i;
-
-assign ready_o    = state == IDLE_S;
-assign valid_o    = state == DONE_S;
-assign quotient_o = rl;
-assign reminder_o = rh;
-
-endmodule
+endmodule 
