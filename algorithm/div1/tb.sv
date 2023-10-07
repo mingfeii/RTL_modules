@@ -3,11 +3,11 @@
 module tb;
 
 parameter int CLK_T          = 10_000;
-parameter int DIVINDED_WIDTH = 8;
-parameter int DIVISOR_WIDTH  = 8;
+parameter int DIVINDED_WIDTH = 20;
+parameter int DIVISOR_WIDTH  = 20;
 parameter int N = DIVINDED_WIDTH;
 parameter int M = DIVISOR_WIDTH;
-parameter NUM = 128;
+parameter NUM = 1000;
 
 bit                    clk;
 bit                    rst_n;
@@ -18,8 +18,11 @@ bit signed [M - 1 : 0] remainder;
 bit                    valid_in;
 bit                    valid_o;
 
-reg  signed [N+1:0] [N-1:0]   dividend_ref ;
-reg  signed [N+1:0] [M-1:0]   divisor_ref ;
+logic  [N+1:0] [N-1:0]   dividend_ref ;
+logic  [N+1:0] [M-1:0]   divisor_ref ;
+
+wire signed [N-1:0] dividend_ref_top;
+wire signed [M-1:0] divisor_ref_top;
 
 bit signed_bit_dividend;
 reg [N-2:0] unsigned_dividend;
@@ -56,7 +59,7 @@ always @(posedge clk or negedge rst_n) begin
       signed_bit_dividend <= $random();
       unsigned_dividend <= $urandom_range(1,2**N-1);
       sigend_bit_divisor <= $random();
-      unsigned_divisor <= $urandom_range(1,2**(M-1)-1);
+      unsigned_divisor <= $urandom_range(1,2**M-1);
       data_count <= data_count + 1;
   end else begin 
       valid_in <= 1'b0;
@@ -88,15 +91,19 @@ generate
   end
 endgenerate
 
+assign dividend_ref_top = dividend_ref[N+1];
+assign divisor_ref_top = divisor_ref[N+1];
+
 //auto check
 reg  error_flag ;
 always @(posedge clk) begin
-  if ((quotient * divisor_ref[N+1] + remainder != dividend_ref[N+1]) && valid_o) begin
-      $display("dividend_ref : %d\n",dividend_ref[N-1]);
-      $display("divisor_ref : %d\n",divisor_ref[N-1]);
+  if ((quotient * divisor_ref_top + remainder != dividend_ref_top) && valid_o) begin
+      $display("dividend_ref : %d\n",dividend_ref_top);
+      $display("divisor_ref : %d\n",divisor_ref_top);
       $display("quotient : %d\n",quotient);
       $display("remainder : %d\n",remainder);
       error_flag <= 1'b1 ;
+      $stop;
   end
   else begin
       error_flag <= 1'b0 ;
@@ -130,7 +137,7 @@ initial
     wait(ocnt == NUM)
     repeat( 10 )
       @( posedge clk );
-    $stop();
+    $finish;
   end
 
 
